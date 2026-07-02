@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  PLAYER
+  COURT_OWNER
+}
+
+enum SurfaceType {
+  INDOOR
+  OUTDOOR
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  PENDING_CONFIRMATION
+  CONFIRMED
+  CANCELLED
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  role          Role      @default(PLAYER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
+
+  @@index([role])
+}
+
+model Facility {
+  id                String   @id @default(cuid())
+  name              String
+  location          String?
+  description       String?
+  cancellationPolicy String?
+  qrCodeImage       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  courts            Court[]
+}
+
+model Court {
+  id           String   @id @default(cuid())
+  facilityId   String
+  name         String
+  surfaceType  SurfaceType
+  pricePerHour Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  facility     Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  schedules    AvailabilitySchedule[]
+  blocks       MaintenanceBlock[]
+  bookings     Booking[]
+
+  @@index([facilityId])
+}
+
+model AvailabilitySchedule {
+  id        String    @id @default(cuid())
+  courtId   String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  court     Court     @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, dayOfWeek])
+}
+
+model MaintenanceBlock {
+  id        String   @id @default(cuid())
+  courtId   String
+  startTime DateTime
+  endTime   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  court     Court    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, startTime, endTime])
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  playerId       String
+  courtId        String
+  startTime      DateTime
+  endTime        DateTime
+  totalPrice     Decimal       @db.Decimal(10, 2)
+  receiptImage   String?
+  status         BookingStatus @default(PENDING_PAYMENT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  player         User          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  court          Court         @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, startTime, endTime])
+  @@index([playerId])
+  @@index([status])
+}
